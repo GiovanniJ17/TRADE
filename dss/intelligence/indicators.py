@@ -147,11 +147,17 @@ class IndicatorCalculator:
     
     @staticmethod
     def _rsi(series: pd.Series, length: int = 14) -> pd.Series:
-        """Relative Strength Index"""
+        """Relative Strength Index (Wilder's smoothing / EMA)
+
+        Uses exponential moving average (alpha=1/length) as per Wilder's
+        original definition, which reacts faster than SMA-based RSI.
+        """
         delta = series.diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=length).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=length).mean()
-        rs = gain / loss
+        gain = delta.where(delta > 0, 0.0)
+        loss = -delta.where(delta < 0, 0.0)
+        avg_gain = gain.ewm(alpha=1.0 / length, min_periods=length, adjust=False).mean()
+        avg_loss = loss.ewm(alpha=1.0 / length, min_periods=length, adjust=False).mean()
+        rs = avg_gain / avg_loss
         rsi = 100 - (100 / (1 + rs))
         return rsi
     
@@ -181,10 +187,15 @@ class IndicatorCalculator:
         return atr
     
     @staticmethod
-    def _calculate_vwap(df: pd.DataFrame) -> pd.Series:
-        """Calculate VWAP (Volume Weighted Average Price)"""
+    def _calculate_vwap(df: pd.DataFrame, window: int = 20) -> pd.Series:
+        """Calculate rolling VWAP (Volume Weighted Average Price)
+
+        Uses a rolling window (default 20 days) instead of cumulative,
+        which is more meaningful for daily swing trading data.
+        """
         typical_price = (df['high'] + df['low'] + df['close']) / 3
-        vwap = (typical_price * df['volume']).cumsum() / df['volume'].cumsum()
+        tp_vol = typical_price * df['volume']
+        vwap = tp_vol.rolling(window=window, min_periods=window).sum() / df['volume'].rolling(window=window, min_periods=window).sum()
         return vwap
     
     # ==================== TREND INDICATORS ====================

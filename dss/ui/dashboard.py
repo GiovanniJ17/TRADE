@@ -44,6 +44,7 @@ if 'last_update' not in st.session_state:
     st.session_state.last_update = None
 
 # Auto-refresh exchange rate on startup (once per session)
+# CRITICAL: Exchange rate affects ALL position sizing calculations
 if 'exchange_rate_refreshed' not in st.session_state:
     try:
         from dss.utils.currency import get_exchange_rate, _fetch_exchange_rate_from_api
@@ -53,9 +54,15 @@ if 'exchange_rate_refreshed' not in st.session_state:
             from datetime import datetime
             st.session_state.user_db.set_setting("cached_exchange_rate_timestamp", datetime.now().isoformat())
             logger.info(f"Auto-refreshed exchange rate: 1 USD = {fresh_rate:.4f} EUR")
+            st.session_state.exchange_rate_status = {'ok': True, 'rate': fresh_rate}
+        else:
+            # API returned None - using stale cached rate
+            cached = get_exchange_rate(user_db=st.session_state.user_db)
+            st.session_state.exchange_rate_status = {'ok': False, 'rate': cached, 'error': 'API non raggiungibile, usando rate in cache'}
         st.session_state.exchange_rate_refreshed = True
     except Exception as e:
         logger.warning(f"Could not auto-refresh exchange rate: {e}")
+        st.session_state.exchange_rate_status = {'ok': False, 'rate': 0.92, 'error': str(e)}
         st.session_state.exchange_rate_refreshed = True
 
 
@@ -345,6 +352,13 @@ def main():
         # Stale Data Warning (QoL 4.1)
         if data_status['is_stale']:
             st.warning(f"⚠️ I dati di mercato potrebbero essere vecchi. Aggiorna prima di generare segnali.")
+
+        # Exchange Rate Warning (critical for position sizing)
+        fx_status = st.session_state.get('exchange_rate_status', {})
+        if fx_status and not fx_status.get('ok', True):
+            st.error(f"⚠️ EUR/USD: usando rate {fx_status.get('rate', 0.92):.4f} (cache). {fx_status.get('error', '')}")
+        elif fx_status and fx_status.get('ok'):
+            st.caption(f"💱 EUR/USD: {fx_status['rate']:.4f}")
         
         # Generate Signals Button
         if st.button("🔄 Generate Signals", type="primary", width="stretch"):

@@ -54,13 +54,9 @@ class MeanReversionRSI:
     STOP_LOSS_PCT = -5.0  # Cap massimo -5%, stop reale = max(ATR*2, entry*0.95)
     RISK_PER_TRADE_EUR = 20.0  # Default, viene sovrascritto da UI settings
     
-    # DEPRECATED: Questi parametri non sono usati - vedi backtest_portfolio.py
-    _DEPRECATED_TARGET_PCT = 4.0
-    _DEPRECATED_MAX_HOLD_DAYS = 15
-    _DEPRECATED_MAX_POSITIONS = 3
-    
-    def __init__(self, user_db=None):
-        self.db = MarketDatabase()
+    def __init__(self, user_db=None, db=None):
+        self.db = db or MarketDatabase()
+        self._owns_db = db is None  # Only close if we created it
         self.user_db = user_db  # For get_exchange_rate()
     
     def generate_signals(
@@ -236,62 +232,22 @@ class MeanReversionRSI:
     
     def _calculate_rsi(self, prices: pd.Series, period: int = 14) -> pd.Series:
         """
-        Calcola RSI (Relative Strength Index)
-        
-        RSI = 100 - (100 / (1 + RS))
-        RS = Average Gain / Average Loss
+        Calcola RSI (Relative Strength Index) con Wilder's smoothing
+
+        Usa EMA (alpha=1/period) come nella definizione originale di Wilder,
+        piu' reattiva della SMA-RSI. Cruciale per segnali mean reversion.
         """
         delta = prices.diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-        
-        rs = gain / loss
+        gain = delta.where(delta > 0, 0.0)
+        loss = -delta.where(delta < 0, 0.0)
+        avg_gain = gain.ewm(alpha=1.0 / period, min_periods=period, adjust=False).mean()
+        avg_loss = loss.ewm(alpha=1.0 / period, min_periods=period, adjust=False).mean()
+        rs = avg_gain / avg_loss
         rsi = 100 - (100 / (1 + rs))
         
         return rsi
-    
-    def check_exit_conditions(
-        self,
-        position: dict,
-        current_price: float,
-        current_rsi: float,
-        entry_date: pd.Timestamp,
-        current_date: pd.Timestamp
-    ) -> Optional[str]:
-        """
-        DEPRECATED: Questa funzione NON è usata dal backtest.
 
-        Il backtest usa la propria logica di exit in backtest_portfolio.py:
-        - Stop loss: ATR × 2.0 (cap -5%)
-        - Trailing stop: +6% trigger, 1.5% distance, 3.5% lock
-        - Max hold: 8 settimane
-
-        I parametri qui sotto sono mantenuti solo per compatibilità
-        ma non hanno effetto sul backtest.
-
-        Returns:
-            'target' se RSI > 70 o price > +4%
-            'stop' se price < -5%
-            'max_hold' se passati 15 giorni
-            None se nessuna exit condition
-        """
-        # Check target (RSI overbought O +4%)
-        profit_pct = ((current_price - position['entry_price']) / position['entry_price']) * 100
-
-        if current_rsi >= self.RSI_OVERBOUGHT or profit_pct >= self._DEPRECATED_TARGET_PCT:
-            return 'target'
-
-        # Check stop loss
-        if profit_pct <= self.STOP_LOSS_PCT:
-            return 'stop'
-
-        # Check max hold
-        days_held = (current_date - entry_date).days
-        if days_held >= self._DEPRECATED_MAX_HOLD_DAYS:
-            return 'max_hold'
-
-        return None
-    
     def close(self):
-        """Cleanup"""
-        self.db.close()
+        """Cleanup - only close db if we own it"""
+        if self._owns_db:
+            self.db.close()
