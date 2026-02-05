@@ -138,7 +138,7 @@ class IndicatorCalculator:
     @staticmethod
     def _sma(series: pd.Series, length: int) -> pd.Series:
         """Simple Moving Average"""
-        return series.rolling(window=length, min_periods=1).mean()
+        return series.rolling(window=length, min_periods=length).mean()
     
     @staticmethod
     def _ema(series: pd.Series, length: int) -> pd.Series:
@@ -207,11 +207,12 @@ class IndicatorCalculator:
         
         plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0)
         minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0)
-        
+
         # Smoothed averages
+        # NOTE: pd.Series must use the original index to avoid NaN from index mismatch
         atr = tr.rolling(window=length).mean()
-        plus_di = 100 * pd.Series(plus_dm).rolling(window=length).mean() / atr
-        minus_di = 100 * pd.Series(minus_dm).rolling(window=length).mean() / atr
+        plus_di = 100 * pd.Series(plus_dm, index=close.index).rolling(window=length).mean() / atr
+        minus_di = 100 * pd.Series(minus_dm, index=close.index).rolling(window=length).mean() / atr
         
         # ADX
         dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di)

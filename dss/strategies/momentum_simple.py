@@ -317,24 +317,31 @@ def calculate_trailing_stop(
 ) -> float:
     """
     Calcola trailing stop secondo regole strategia (Short-Term Swing)
-    
-    Regole:
+
+    NOTA: Questa funzione usa parametri legacy. Il backtest reale usa
+    i parametri definiti in scripts/backtest_portfolio.py:
+    - TRAILING_TRIGGER_PCT = 6.0, TRAILING_DISTANCE_PCT = 1.5, TRAILING_MIN_LOCK_PCT = 3.5
+
+    Regole (legacy):
     - Se profit < +3%: stop = entry - 5%
     - Se profit >= +3%: stop = entry + 1% (trailing attivato)
-    
+
     Args:
         entry_price: Prezzo ingresso
         current_price: Prezzo corrente
         highest_price: Prezzo massimo raggiunto
-    
+
     Returns:
         Prezzo trailing stop
     """
+    TRAILING_TRIGGER_PCT = 3.0
+    TRAILING_STOP_PCT = 1.0
+
     profit_pct = ((current_price - entry_price) / entry_price) * 100
-    
-    if profit_pct < SimpleMomentumStrategy.TRAILING_TRIGGER_PCT:
+
+    if profit_pct < TRAILING_TRIGGER_PCT:
         # Trailing non attivo, usa stop fisso -5%
         return entry_price * (1 + SimpleMomentumStrategy.STOP_LOSS_PCT / 100)
     else:
         # Trailing attivo: stop = entry + 1%
-        return entry_price * (1 + SimpleMomentumStrategy.TRAILING_STOP_PCT / 100)
+        return entry_price * (1 + TRAILING_STOP_PCT / 100)

@@ -179,11 +179,12 @@ class MarketRegimeDetector:
         
         plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0)
         minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0)
-        
+
         # Smoothed indicators
+        # NOTE: pd.Series must use the original DataFrame index to avoid NaN from index mismatch
         atr = tr.rolling(window=period).mean()
-        plus_di = 100 * pd.Series(plus_dm).rolling(window=period).mean() / atr
-        minus_di = 100 * pd.Series(minus_dm).rolling(window=period).mean() / atr
+        plus_di = 100 * pd.Series(plus_dm, index=df.index).rolling(window=period).mean() / atr
+        minus_di = 100 * pd.Series(minus_dm, index=df.index).rolling(window=period).mean() / atr
         
         # ADX
         dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di)
