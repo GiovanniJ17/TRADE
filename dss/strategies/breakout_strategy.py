@@ -289,36 +289,36 @@ class BreakoutStrategy:
     ) -> Optional[str]:
         """
         DEPRECATED: Questa funzione NON è usata dal backtest.
-        
+
         Il backtest usa la propria logica di exit in backtest_portfolio.py:
         - Stop loss: ATR × 2.0 (cap -5%)
         - Trailing stop: +6% trigger, 1.5% distance, 3.5% lock
         - Max hold: 8 settimane
-        
-        I parametri qui sotto (TARGET_PCT, STOP_LOSS_PCT, MAX_HOLD_DAYS)
-        sono mantenuti solo per compatibilità ma non hanno effetto.
-        
+
+        I parametri qui sotto sono mantenuti solo per compatibilità
+        ma non hanno effetto sul backtest.
+
         Returns:
             'target' se +8%
-            'stop' se -3%
-            'max_hold' se 5 giorni
+            'stop' se -5%
+            'max_hold' se 15 giorni
             None altrimenti
         """
         profit_pct = ((current_price - position['entry_price']) / position['entry_price']) * 100
-        
+
         # Check target
-        if profit_pct >= self.TARGET_PCT:
+        if profit_pct >= self._DEPRECATED_TARGET_PCT:
             return 'target'
-        
+
         # Check stop
         if profit_pct <= self.STOP_LOSS_PCT:
             return 'stop'
-        
+
         # Check max hold
         days_held = (current_date - entry_date).days
-        if days_held >= self.MAX_HOLD_DAYS:
+        if days_held >= self._DEPRECATED_MAX_HOLD_DAYS:
             return 'max_hold'
-        
+
         return None
     
     def close(self):

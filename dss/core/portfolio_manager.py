@@ -140,7 +140,7 @@ SECTOR_MAPPING = {
     'TRV': 'Financials', 'USB': 'Financials', 'FITB': 'Financials', 'RF': 'Financials',
     'STT': 'Financials', 'TROW': 'Financials', 'WAL': 'Financials', 'NU': 'Financials',
     'MKTX': 'Financials', 'CBOE': 'Financials', 'NDAQ': 'Financials', 'MCO': 'Financials',
-    'SPGI': 'Financials', 'AON': 'Financials', 'AJG': 'Financials', 'BRK.B': 'Financials',
+    'AON': 'Financials', 'AJG': 'Financials', 'BRK.B': 'Financials',
     
     # Additional Industrials
     'PCAR': 'Industrials', 'ODFL': 'Industrials', 'FAST': 'Industrials', 'CPRT': 'Industrials',
@@ -174,7 +174,7 @@ SECTOR_MAPPING = {
     'PNR': 'Utilities',
     
     # Additional Real Estate
-    'WELL': 'Real Estate', 'VTR': 'Real Estate', 'ARE': 'Real Estate', 'BXP': 'Real Estate',
+    'VTR': 'Real Estate', 'ARE': 'Real Estate', 'BXP': 'Real Estate',
     'KIM': 'Real Estate', 'REG': 'Real Estate', 'CPT': 'Real Estate', 'EXR': 'Real Estate',
     'AVB': 'Real Estate', 'EQR': 'Real Estate', 'MAA': 'Real Estate', 'UDR': 'Real Estate',
     
@@ -190,7 +190,7 @@ SECTOR_MAPPING = {
     
     # Misc Technology
     'HPE': 'Technology', 'HPQ': 'Technology', 'FIS': 'Technology', 'HWM': 'Technology',
-    'HIG': 'Technology', 'UPWK': 'Technology', 'SYF': 'Financials',
+    'HIG': 'Financials', 'UPWK': 'Technology', 'SYF': 'Financials',
     
     # Additional (misc)
     'GTLS': 'Industrials',
