@@ -262,10 +262,12 @@ def _fmt_eur(amount_eur):
 
 
 def reload_portfolio_manager():
-    """Force reload of portfolio manager with new settings"""
+    """Force reload of portfolio manager with new settings, clear cached signals"""
     if 'portfolio_mgr' in st.session_state:
         del st.session_state['portfolio_mgr']
     st.session_state.portfolio_mgr = PortfolioManager()
+    st.session_state.signals = None
+    st.session_state.last_update = None
     logger.info("Portfolio Manager reloaded with new settings")
 
 
@@ -1639,11 +1641,16 @@ def render_settings_page():
         st.caption(f"Current: €{portfolio_mgr.TOTAL_CAPITAL:,.0f}")
         
         if st.form_submit_button("💾 Update Capital", type="primary"):
-            portfolio_mgr.update_settings(total_capital=new_capital)
-            reload_portfolio_manager()
-            st.success(f"✅ Capital updated to €{new_capital:,.0f}")
-            st.info("💡 Regenerate signals to apply new capital allocation")
-            st.rerun()
+            if new_capital < 1000:
+                st.error("Capital must be at least €1,000")
+            elif new_capital > 1000000:
+                st.error("Capital must be at most €1,000,000")
+            else:
+                portfolio_mgr.update_settings(total_capital=new_capital)
+                reload_portfolio_manager()
+                st.success(f"✅ Capital updated to €{new_capital:,.0f}")
+                st.info("💡 Regenerate signals to apply new capital allocation")
+                st.rerun()
     
     st.divider()
     
@@ -1703,13 +1710,16 @@ def render_settings_page():
         st.caption(f"~€{stock_capital / max_stock:,.0f} per position")
         
         if st.form_submit_button("💾 Update Limits", type="primary"):
-            portfolio_mgr.update_settings(
-                max_stock_positions=max_stock
-            )
-            reload_portfolio_manager()
-            st.success("✅ Position limits updated!")
-            st.info("💡 Regenerate signals to apply new limits")
-            st.rerun()
+            if max_stock < 1 or max_stock > 10:
+                st.error("Max positions must be between 1 and 10")
+            else:
+                portfolio_mgr.update_settings(
+                    max_stock_positions=max_stock
+                )
+                reload_portfolio_manager()
+                st.success("✅ Position limits updated!")
+                st.info("💡 Regenerate signals to apply new limits")
+                st.rerun()
     
     st.divider()
     
@@ -1745,14 +1755,19 @@ def render_settings_page():
         """)
         
         if st.form_submit_button("💾 Update Risk", type="primary"):
-            st.session_state.user_db.set_setting("risk_per_stock_trade", str(new_stock_risk))
-            
-            # Reload portfolio manager to apply new risk settings
-            reload_portfolio_manager()
-            
-            st.success("✅ Risk per trade updated!")
-            st.info("💡 Regenerate signals to apply new risk parameters")
-            st.rerun()
+            if new_stock_risk < 10:
+                st.error("Risk per trade must be at least €10")
+            elif stock_pct_risk > 5:
+                st.error("Risk per trade cannot exceed 5% of total capital")
+            else:
+                st.session_state.user_db.set_setting("risk_per_stock_trade", str(new_stock_risk))
+
+                # Reload portfolio manager to apply new risk settings
+                reload_portfolio_manager()
+
+                st.success("✅ Risk per trade updated!")
+                st.info("💡 Regenerate signals to apply new risk parameters")
+                st.rerun()
     
     st.divider()
     
@@ -1852,6 +1867,71 @@ def render_settings_page():
     
     st.divider()
     
+    # Watchlist Management
+    st.subheader("📋 Watchlist Management")
+    st.caption("Add or remove symbols from your trading watchlist")
+
+    watchlist_path = Path(config.get("data_provider.symbols_file", "config/watchlist.txt"))
+    current_symbols = []
+    if watchlist_path.exists():
+        with open(watchlist_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    current_symbols.append(line.upper())
+
+    st.info(f"Current watchlist: {len(current_symbols)} symbols")
+
+    col_add, col_remove = st.columns(2)
+    with col_add:
+        with st.form("add_symbol_form"):
+            new_symbol = st.text_input(
+                "Add Symbol",
+                placeholder="e.g. AAPL",
+                help="Enter a valid US stock ticker symbol"
+            ).strip().upper()
+            if st.form_submit_button("Add Symbol"):
+                if not new_symbol:
+                    st.error("Please enter a symbol")
+                elif len(new_symbol) > 5 or not new_symbol.replace('.', '').isalpha():
+                    st.error("Invalid symbol format")
+                elif new_symbol in current_symbols:
+                    st.warning(f"{new_symbol} is already in the watchlist")
+                else:
+                    with open(watchlist_path, 'a') as f:
+                        f.write(f"\n{new_symbol}")
+                    st.session_state.user_db.add_to_watchlist(new_symbol)
+                    st.success(f"Added {new_symbol} to watchlist")
+                    st.rerun()
+
+    with col_remove:
+        with st.form("remove_symbol_form"):
+            remove_sym = st.selectbox(
+                "Remove Symbol",
+                options=sorted(current_symbols),
+                index=None,
+                placeholder="Select symbol to remove"
+            )
+            if st.form_submit_button("Remove Symbol"):
+                if remove_sym and remove_sym in current_symbols:
+                    current_symbols.remove(remove_sym)
+                    with open(watchlist_path, 'w') as f:
+                        # Preserve header comments
+                        f.write("# US Stock Watchlist\n")
+                        f.write("# One symbol per line\n\n")
+                        for sym in sorted(current_symbols):
+                            f.write(f"{sym}\n")
+                    st.session_state.user_db.remove_from_watchlist(remove_sym)
+                    st.success(f"Removed {remove_sym} from watchlist")
+                    st.rerun()
+
+    with st.expander("View Full Watchlist"):
+        cols = st.columns(6)
+        for i, sym in enumerate(sorted(current_symbols)):
+            cols[i % 6].write(sym)
+
+    st.divider()
+
     # Reset to defaults
     st.subheader("🔄 Reset to Defaults")
     st.caption("Restore original system settings (€10,000 capital, balanced allocation)")

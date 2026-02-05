@@ -194,6 +194,13 @@ SECTOR_MAPPING = {
     
     # Additional (misc)
     'GTLS': 'Industrials',
+
+    # Previously unmapped watchlist symbols
+    'CFLT': 'Technology',       # Confluent - data streaming platform
+    'ELV': 'Healthcare',        # Elevance Health - health insurer
+    'EXPD': 'Industrials',      # Expeditors International - freight logistics
+    'J': 'Industrials',         # Jacobs Solutions - engineering services
+    'MCK': 'Healthcare',        # McKesson - pharma distribution
 }
 
 

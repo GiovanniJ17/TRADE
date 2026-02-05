@@ -19,7 +19,7 @@ from loguru import logger
 
 from ..database.market_db import MarketDatabase
 from ..database.user_db import UserDatabase
-from ..intelligence.signal_generator import SignalGenerator
+from ..core.portfolio_manager import PortfolioManager
 from ..intelligence.risk_manager import RiskManager
 from ..utils.config import config
 
@@ -232,7 +232,7 @@ class PaperTradingEngine:
     def __init__(self, paper_trading_dir: Optional[Path] = None):
         self.db = MarketDatabase()
         self.user_db = UserDatabase()
-        self.signal_gen = SignalGenerator()
+        self.portfolio_mgr = PortfolioManager(user_db=self.user_db)
         
         # Directory per persistenza dati paper trading
         self.paper_dir = paper_trading_dir or Path("./data/paper_trading")
@@ -283,20 +283,20 @@ class PaperTradingEngine:
         min_score: int = 6,
         symbols: Optional[List[str]] = None
     ) -> List[Dict]:
-        """Genera nuovi segnali per paper trading"""
-        logger.info("🔍 Generating new signals for paper trading...")
-        
-        signals = self.signal_gen.generate_signals(
-            min_score=min_score,
-            symbols=symbols
+        """Genera nuovi segnali per paper trading usando PortfolioManager"""
+        logger.info("Generating new signals for paper trading (PortfolioManager)...")
+
+        portfolio = self.portfolio_mgr.generate_portfolio_signals(
+            stock_symbols=symbols
         )
-        
+        signals = portfolio.get('stock_signals', [])
+
         # Filtra simboli già in posizione
         open_symbols = {t.symbol for t in self.open_trades}
         available_signals = [s for s in signals if s["symbol"] not in open_symbols]
-        
+
         logger.info(f"Found {len(available_signals)} new signals (excluding {len(open_symbols)} open positions)")
-        
+
         return available_signals
     
     def open_paper_trade(self, signal: Dict, apply_slippage: bool = True) -> PaperTrade:
@@ -743,4 +743,4 @@ class PaperTradingEngine:
         """Cleanup"""
         self._save_state()
         self.db.close()
-        self.signal_gen.close()
+        self.portfolio_mgr.close()

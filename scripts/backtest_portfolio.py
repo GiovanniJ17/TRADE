@@ -857,7 +857,8 @@ def main():
     parser = argparse.ArgumentParser(description="Backtest Portfolio - Workflow Martedì→Venerdì")
     parser.add_argument("--years", type=int, default=1, help="Years to backtest")
     parser.add_argument("--capital", type=float, default=10_000.0, help="Initial capital (EUR)")
-    parser.add_argument("--slots", type=int, default=3, help="Max positions (default: 3)")
+    default_slots = config.get("portfolio.max_stock_positions", 3)
+    parser.add_argument("--slots", type=int, default=default_slots, help=f"Max positions (default: {default_slots} from config)")
     
     args = parser.parse_args()
     
