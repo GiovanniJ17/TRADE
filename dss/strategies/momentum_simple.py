@@ -57,15 +57,9 @@ class SimpleMomentumStrategy:
     STOP_LOSS_PCT = -5.0  # Cap massimo -5%, stop reale = max(ATR*2, entry*0.95)
     RISK_PER_TRADE_EUR = 20.0  # Default, viene sovrascritto da UI settings
     
-    # DEPRECATED: Questi parametri non sono usati - mantenuti per retrocompatibilità
-    # Vedi backtest_portfolio.py per i valori effettivi
-    _DEPRECATED_TRAILING_TRIGGER_PCT = 3.0
-    _DEPRECATED_TRAILING_STOP_PCT = 1.0
-    _DEPRECATED_MAX_HOLD_DAYS = 15
-    _DEPRECATED_MAX_POSITIONS = 3
-    
-    def __init__(self, user_db=None):
-        self.db = MarketDatabase()
+    def __init__(self, user_db=None, db=None):
+        self.db = db or MarketDatabase()
+        self._owns_db = db is None  # Only close if we created it
         self.user_db = user_db  # For get_exchange_rate()
     
     def generate_signals(
@@ -306,42 +300,6 @@ class SimpleMomentumStrategy:
         return ((current_price / past_price) - 1) * 100
     
     def close(self):
-        """Cleanup"""
-        self.db.close()
-
-
-def calculate_trailing_stop(
-    entry_price: float,
-    current_price: float,
-    highest_price: float
-) -> float:
-    """
-    Calcola trailing stop secondo regole strategia (Short-Term Swing)
-
-    NOTA: Questa funzione usa parametri legacy. Il backtest reale usa
-    i parametri definiti in scripts/backtest_portfolio.py:
-    - TRAILING_TRIGGER_PCT = 6.0, TRAILING_DISTANCE_PCT = 1.5, TRAILING_MIN_LOCK_PCT = 3.5
-
-    Regole (legacy):
-    - Se profit < +3%: stop = entry - 5%
-    - Se profit >= +3%: stop = entry + 1% (trailing attivato)
-
-    Args:
-        entry_price: Prezzo ingresso
-        current_price: Prezzo corrente
-        highest_price: Prezzo massimo raggiunto
-
-    Returns:
-        Prezzo trailing stop
-    """
-    TRAILING_TRIGGER_PCT = 3.0
-    TRAILING_STOP_PCT = 1.0
-
-    profit_pct = ((current_price - entry_price) / entry_price) * 100
-
-    if profit_pct < TRAILING_TRIGGER_PCT:
-        # Trailing non attivo, usa stop fisso -5%
-        return entry_price * (1 + SimpleMomentumStrategy.STOP_LOSS_PCT / 100)
-    else:
-        # Trailing attivo: stop = entry + 1%
-        return entry_price * (1 + TRAILING_STOP_PCT / 100)
+        """Cleanup - only close db if we own it"""
+        if self._owns_db:
+            self.db.close()

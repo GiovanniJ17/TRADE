@@ -33,6 +33,7 @@ sys.path.insert(0, str(project_root))
 from dss.core.portfolio_manager import PortfolioManager
 from dss.database.market_db import MarketDatabase
 from dss.database.user_db import UserDatabase
+from dss.utils.config import config
 from dss.utils.currency import get_exchange_rate
 import pandas as pd
 import numpy as np
@@ -43,32 +44,24 @@ _user_db = UserDatabase()
 EUR_USD_RATE = get_exchange_rate(user_db=_user_db)
 logger.info(f"Using EUR/USD rate: {EUR_USD_RATE}")
 
-# Friday exit threshold
-# OPTIMIZED: Extended to 8 weeks to let winners run longer
-# Trailing stop will manage exits, not arbitrary time limits
-MAX_HOLD_WEEKS = 8  # Max 8 weekly cycles (~2 months)
+# =============================================================================
+# ALL PARAMETERS READ FROM config.yaml (single source of truth)
+# =============================================================================
+MAX_HOLD_WEEKS = config.get("risk.max_hold_weeks", 8)
+ENTRY_SLIPPAGE_PCT = config.get("risk.entry_slippage_pct", 0.2)
+EXIT_SLIPPAGE_PCT = config.get("risk.exit_slippage_pct", 0.1)
+TRAILING_TRIGGER_PCT = config.get("risk.trailing_trigger_pct", 6.0)
+TRAILING_DISTANCE_PCT = config.get("risk.trailing_distance_pct", 1.5)
+TRAILING_MIN_LOCK_PCT = config.get("risk.trailing_min_lock_pct", 3.5)
 
-# Slippage configuration
-ENTRY_SLIPPAGE_PCT = 0.2   # 0.2% slippage on entry (buy higher)
-EXIT_SLIPPAGE_PCT = 0.1    # 0.1% slippage on exit (sell lower)
-
-# Trailing stop configuration (FORMIDABLE FINAL - best balance)
-TRAILING_TRIGGER_PCT = 6.0   # Activate at +6% profit
-TRAILING_DISTANCE_PCT = 1.5  # Trail 1.5% below high
-TRAILING_MIN_LOCK_PCT = 3.5  # Minimum lock: entry +3.5%
-
-# Breakeven stop - DISABILITATO
-# I test hanno mostrato che causa troppe uscite premature: quando un trade
-# sale a +3% e poi ritraccia, viene chiuso a entry che con commissioni = perdita.
-# Il sistema funziona meglio lasciando lo stop ATR in posizione.
+# Breakeven stop - DISABILITATO (non in config, troppo fragile)
 BREAKEVEN_ENABLED = False
-BREAKEVEN_TRIGGER_PCT = 3.0  # Non usato se BREAKEVEN_ENABLED = False
+BREAKEVEN_TRIGGER_PCT = 3.0
 
-# Bear Market Protection - CASH quando mercato in ribasso
-# Quando SPY < SMA200 E SPY < SMA50 → bear market confermato
-BEAR_MARKET_PROTECTION = True
-BEAR_MARKET_MODE = "cash"  # "cash" = 0 nuove posizioni, "reduced" = 1 slot solo
-BEAR_MARKET_EXIT_POSITIONS = True  # Se True, chiude posizioni esistenti all'ingresso in bear market
+# Bear Market Protection
+BEAR_MARKET_PROTECTION = config.get("risk.bear_market_protection", True)
+BEAR_MARKET_MODE = config.get("risk.bear_market_mode", "cash")
+BEAR_MARKET_EXIT_POSITIONS = config.get("risk.bear_market_exit_positions", True)
 
 
 def run_portfolio_backtest(
@@ -864,7 +857,8 @@ def main():
     parser = argparse.ArgumentParser(description="Backtest Portfolio - Workflow Martedì→Venerdì")
     parser.add_argument("--years", type=int, default=1, help="Years to backtest")
     parser.add_argument("--capital", type=float, default=10_000.0, help="Initial capital (EUR)")
-    parser.add_argument("--slots", type=int, default=3, help="Max positions (default: 3)")
+    default_slots = config.get("portfolio.max_stock_positions", 3)
+    parser.add_argument("--slots", type=int, default=default_slots, help=f"Max positions (default: {default_slots} from config)")
     
     args = parser.parse_args()
     

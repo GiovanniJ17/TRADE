@@ -1,5 +1,6 @@
-"""DuckDB market data database"""
+"""DuckDB market data database with singleton connection pooling"""
 import duckdb
+import threading
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, List
@@ -10,14 +11,30 @@ from ..utils.config import config
 
 
 class MarketDatabase:
-    """DuckDB database for market data (OLAP)"""
-    
+    """DuckDB database for market data (OLAP) with singleton connection pooling"""
+
+    _instances: dict = {}
+    _lock = threading.Lock()
+
+    def __new__(cls, db_path: Optional[str] = None):
+        resolved = str(Path(db_path or config.get_env("DUCKDB_PATH", "./data/market_data.duckdb")).resolve())
+        with cls._lock:
+            if resolved not in cls._instances or cls._instances[resolved]._closed:
+                instance = super().__new__(cls)
+                instance._closed = False
+                instance._initialized = False
+                cls._instances[resolved] = instance
+            return cls._instances[resolved]
+
     def __init__(self, db_path: Optional[str] = None):
+        if self._initialized:
+            return
+        self._initialized = True
         self.db_path = Path(db_path or config.get_env("DUCKDB_PATH", "./data/market_data.duckdb"))
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.parquet_dir = Path(config.get_env("DATA_DIR", "./data/parquet"))
         self.parquet_dir.mkdir(parents=True, exist_ok=True)
-        
+
         self.conn = duckdb.connect(str(self.db_path))
         self._initialize_schema()
     
@@ -177,9 +194,13 @@ class MarketDatabase:
         return [row[0] for row in result]
     
     def close(self):
-        """Close database connection"""
+        """Close database connection and remove from pool"""
         if self.conn:
             self.conn.close()
+            self._closed = True
+            self._initialized = False
+            resolved = str(self.db_path.resolve())
+            self._instances.pop(resolved, None)
     
     def __enter__(self):
         """Context manager entry"""

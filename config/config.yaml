@@ -94,7 +94,24 @@ risk:
   target_atr_multiplier: 3.0       # TP2 = Entry + 3x ATR
   tp1_atr_multiplier: 1.5          # TP1 = Entry + 1.5x ATR (sell 50%)
   tp2_atr_multiplier: 3.0          # TP2 = Entry + 3x ATR (close remaining)
-  
+
+  # Trailing stop settings (SINGLE SOURCE OF TRUTH - used by both backtest and live)
+  trailing_trigger_pct: 6.0        # Activate trailing at +6% profit from entry
+  trailing_distance_pct: 1.5       # Trail 1.5% below highest price
+  trailing_min_lock_pct: 3.5       # Minimum lock: entry + 3.5% (floor)
+
+  # Hold period
+  max_hold_weeks: 8                # Max hold: 8 weeks (~2 months)
+
+  # Slippage model
+  entry_slippage_pct: 0.2          # 0.2% slippage on entry (buy higher)
+  exit_slippage_pct: 0.1           # 0.1% slippage on exit (sell lower)
+
+  # Bear market protection
+  bear_market_protection: true     # Enable SPY SMA-based bear market detection
+  bear_market_mode: "cash"         # "cash" = 0 new entries, "reduced" = 1 slot only
+  bear_market_exit_positions: true # Close existing positions on bear market entry
+
   # Trade Republic cost model (Section 7.5)
   commission_per_trade: 1.0        # €1 per trade
   min_trade_value: 50.0            # Minimum €50 trade value

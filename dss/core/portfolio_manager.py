@@ -194,6 +194,13 @@ SECTOR_MAPPING = {
     
     # Additional (misc)
     'GTLS': 'Industrials',
+
+    # Previously unmapped watchlist symbols
+    'CFLT': 'Technology',       # Confluent - data streaming platform
+    'ELV': 'Healthcare',        # Elevance Health - health insurer
+    'EXPD': 'Industrials',      # Expeditors International - freight logistics
+    'J': 'Industrials',         # Jacobs Solutions - engineering services
+    'MCK': 'Healthcare',        # McKesson - pharma distribution
 }
 
 
@@ -221,22 +228,24 @@ class PortfolioManager:
     MAX_NATR_PERCENT = 8.0  # Max 8% normalized ATR (allow more volatile but profitable stocks)
     
     def __init__(self, user_db=None):
+        # Single shared MarketDatabase instance for all components
+        # (avoids 5 concurrent DuckDB connections to the same file)
         self.db = MarketDatabase()
-        self.regime_detector = MarketRegimeDetector()
-        
+        self.regime_detector = MarketRegimeDetector(db=self.db)
+
         # Import qui per evitare circular import
         if user_db is None:
             from ..database.user_db import UserDatabase
             user_db = UserDatabase()
         self.user_db = user_db
-        
+
         # Load settings from database (con fallback ai default)
         self._load_settings()
-        
-        # Strategies (pass user_db for get_exchange_rate())
-        self.momentum = SimpleMomentumStrategy(user_db=self.user_db)
-        self.mean_reversion = MeanReversionRSI(user_db=self.user_db)
-        self.breakout = BreakoutStrategy(user_db=self.user_db)
+
+        # Strategies share the same db connection
+        self.momentum = SimpleMomentumStrategy(user_db=self.user_db, db=self.db)
+        self.mean_reversion = MeanReversionRSI(user_db=self.user_db, db=self.db)
+        self.breakout = BreakoutStrategy(user_db=self.user_db, db=self.db)
         
         # Apply risk settings to strategies
         self._apply_risk_settings()

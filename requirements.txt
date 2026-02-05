@@ -7,14 +7,6 @@ polars>=0.19.0
 duckdb>=0.9.0
 pyarrow>=12.0.0
 
-# Backtesting & Technical Analysis
-# vectorbt>=0.25.0  # Optional - may have compatibility issues with Python 3.14
-# Note: VectorBT has known issues with Python 3.14 (sklearn/joblib compatibility)
-# Install separately if needed: pip install vectorbt
-# Consider using Python 3.11 or 3.12 for full VectorBT compatibility
-# pandas-ta>=0.3.14b0  # Temporarily disabled - incompatible with Python 3.14
-# Note: Using custom indicator implementation instead
-
 # Async HTTP & Data Ingestion
 aiohttp>=3.9.0
 asyncio-throttle>=1.0.2
@@ -33,3 +25,7 @@ python-dotenv>=1.0.0
 
 # Logging & Monitoring
 loguru>=0.7.2
+
+# Testing
+pytest>=7.0.0
+pytest-asyncio>=0.21.0

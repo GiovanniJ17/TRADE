@@ -8,46 +8,44 @@ import pandas as pd
 from loguru import logger
 
 from .base import DataProvider
+from .rate_limiter import TokenBucket
 from ..utils.config import config
 
 
 class PolygonProvider(DataProvider):
     """Polygon.io API implementation"""
-    
+
     BASE_URL = "https://api.polygon.io"
-    
+
     def __init__(self, api_key: Optional[str] = None):
         super().__init__(api_key or config.get_env("POLYGON_API_KEY"))
         if not self.api_key:
             raise ValueError("Polygon API key required")
-        
-        # Rate limiting based on plan
+
+        # Rate limiting via TokenBucket (safe for concurrent requests)
         plan = config.get("data_provider.plan", "free").lower()
         requests_per_minute = config.get("data_provider.requests_per_minute", None)
-        
+
         if requests_per_minute:
-            # Use configured value
-            self.rate_limit_delay = max(0.1, 60.0 / requests_per_minute * 1.1)  # 10% safety margin
+            rpm = int(requests_per_minute)
         elif plan == "free":
-            # Free tier: 5 requests per MINUTE
-            self.rate_limit_delay = 13  # 13 seconds to be safe
+            rpm = 5
         elif plan == "starter":
-            # Starter: Unlimited API calls, but be respectful (~200 req/min recommended)
-            # Can go faster but 200/min is a good balance
-            self.rate_limit_delay = 0.3  # ~0.3 seconds (200 req/min)
+            rpm = 200
         elif plan == "developer":
-            # Developer: 1000 requests per minute
-            self.rate_limit_delay = 0.06  # ~0.06 seconds
+            rpm = 1000
         elif plan == "advanced":
-            # Advanced: unlimited (but be respectful)
-            self.rate_limit_delay = 0.05  # 50ms delay
+            rpm = 2000
         else:
-            # Default to free tier
-            self.rate_limit_delay = 13
-        
-        logger.info(f"Polygon provider initialized - Plan: {plan}, Rate limit delay: {self.rate_limit_delay:.2f}s")
+            rpm = 5
+
+        # TokenBucket: capacity = burst size (10% of RPM, min 1), refill = tokens/sec
+        burst = max(1, rpm // 10)
+        refill_rate = rpm / 60.0  # tokens per second
+        self._rate_limiter = TokenBucket(capacity=burst, refill_rate=refill_rate)
+
+        logger.info(f"Polygon provider initialized - Plan: {plan}, {rpm} req/min (burst: {burst})")
         self._session: Optional[aiohttp.ClientSession] = None
-        self._last_request_time = 0
     
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create aiohttp session"""
@@ -108,15 +106,8 @@ class PolygonProvider(DataProvider):
         }
         
         try:
-            # Rate limiting: ensure at least rate_limit_delay seconds between requests
-            current_time = time.time()
-            time_since_last = current_time - self._last_request_time
-            if time_since_last < self.rate_limit_delay:
-                wait_time = self.rate_limit_delay - time_since_last
-                logger.debug(f"Rate limiting: waiting {wait_time:.1f} seconds before next request")
-                await asyncio.sleep(wait_time)
-            
-            self._last_request_time = time.time()
+            # TokenBucket rate limiting: safe for concurrent requests
+            await self._rate_limiter.wait_for_token()
             
             async with session.get(url, params=params) as response:
                 if response.status == 200:
@@ -139,7 +130,7 @@ class PolygonProvider(DataProvider):
                     logger.warning(f"Rate limit exceeded for {symbol}. Waiting 60 seconds before retry...")
                     await asyncio.sleep(60)  # Wait 1 minute
                     # Retry once
-                    self._last_request_time = time.time()
+                    await self._rate_limiter.wait_for_token()
                     async with session.get(url, params=params) as response:
                         if response.status == 200:
                             data = await response.json()
@@ -192,10 +183,7 @@ class PolygonProvider(DataProvider):
         url = f"{self.BASE_URL}/v2/snapshot/locale/us/markets/stocks/tickers/{symbol.upper()}"
         params = {"apiKey": self.api_key}
         try:
-            current_time = time.time()
-            if current_time - self._last_request_time < self.rate_limit_delay:
-                await asyncio.sleep(self.rate_limit_delay - (current_time - self._last_request_time))
-            self._last_request_time = time.time()
+            await self._rate_limiter.wait_for_token()
             async with session.get(url, params=params) as response:
                 if response.status != 200:
                     return None
@@ -307,12 +295,7 @@ class PolygonProvider(DataProvider):
         params = {"apiKey": self.api_key}
         
         try:
-            # Rate limiting
-            current_time = time.time()
-            if current_time - self._last_request_time < self.rate_limit_delay:
-                await asyncio.sleep(self.rate_limit_delay - (current_time - self._last_request_time))
-            self._last_request_time = time.time()
-            
+            await self._rate_limiter.wait_for_token()
             async with session.get(url, params=params) as response:
                 if response.status != 200:
                     logger.debug(f"Ticker details not found for {symbol}: {response.status}")

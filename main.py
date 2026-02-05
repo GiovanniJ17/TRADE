@@ -58,76 +58,6 @@ def run_backtest(args):
     return
 
 
-def run_backtest_legacy(args):
-    """
-    Run legacy backtest using SignalGenerator (scoring system).
-    DEPRECATED: Use run_backtest() instead for consistency with dashboard.
-    """
-    from dss.backtesting.historical_validator import HistoricalValidator
-
-    print("\n⚠️ WARNING: Using legacy backtest (SignalGenerator scoring system)")
-    print("   For consistency with dashboard, use: python scripts/backtest_portfolio.py\n")
-
-    validator = HistoricalValidator()
-    try:
-        end_date = datetime.now().strftime("%Y-%m-%d")
-        years = getattr(args, "years", 3)
-        start_date = (datetime.now() - timedelta(days=365 * years)).strftime("%Y-%m-%d")
-        min_score = getattr(args, "min_score", 6)
-        initial_capital = getattr(args, "capital", 1500.0)
-        step_days = getattr(args, "step_days", 7)
-
-        logger.info(
-            f"Running backtest from {start_date} to {end_date} "
-            f"(min_score={min_score}, step_days={step_days})"
-        )
-        print("Backtest may take several minutes (progress logged every ~10%). Use --step-days 1 for daily signals (slower).\n")
-
-        results = validator.run_historical_simulation(
-            start_date=start_date,
-            end_date=end_date,
-            min_score=min_score,
-            initial_capital=initial_capital,
-            step_days=step_days,
-        )
-
-        metrics = results.get("metrics", {})
-        if metrics.get("error"):
-            print(f"\nBacktest: {metrics['error']}")
-            return
-
-        print("\n" + "=" * 60)
-        print("LEGACY BACKTEST RESULTS (Scoring System)")
-        print("=" * 60)
-        print(f"\nPeriod: {start_date} to {end_date}")
-        print(f"Initial capital: €{initial_capital:,.2f}")
-        print(f"Final capital: €{results['final_capital']:,.2f}")
-        print(f"Total return: {results['total_return_pct']:.2f}%")
-
-        print(f"\n--- Performance ---")
-        print(f"Total trades: {metrics.get('total_trades', 0)}")
-        print(f"Win rate: {metrics.get('win_rate', 0)}%")
-        print(f"Profit factor: {metrics.get('profit_factor', 0)}")
-        print(f"Avg R-multiple: {metrics.get('avg_r_multiple', 0)}")
-        print(f"Sharpe ratio: {metrics.get('sharpe_ratio', 0)}")
-        print(f"Max drawdown: €{metrics.get('max_drawdown', 0):.2f} ({metrics.get('max_drawdown_pct', 0):.2f}%)")
-        print(f"Best trade: €{metrics.get('best_trade', 0):.2f}")
-        print(f"Worst trade: €{metrics.get('worst_trade', 0):.2f}")
-        print(f"Max consecutive wins: {metrics.get('max_consecutive_wins', 0)}")
-        print(f"Max consecutive losses: {metrics.get('max_consecutive_losses', 0)}")
-
-        out_file = f"backtest_legacy_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        with open(out_file, "w", encoding="utf-8") as f:
-            json.dump(
-                {k: v for k, v in results.items() if k != "trades" and k != "equity_curve"},
-                f,
-                indent=2,
-            )
-        print(f"\nMetrics saved to: {out_file}")
-    finally:
-        validator.close()
-
-
 def main():
     """Main entry point"""
     import argparse
@@ -135,8 +65,8 @@ def main():
     parser = argparse.ArgumentParser(description="Algorithmic Trading Workstation (DSS)")
     parser.add_argument(
         "mode",
-        choices=["ui", "desktop", "update", "signals", "monitor", "backtest", "backtest-legacy", "walkforward", "stress", "paper"],
-        help="Mode: ui, desktop, update, signals, monitor, backtest (PortfolioManager), backtest-legacy (SignalGenerator), walkforward, stress, paper",
+        choices=["ui", "desktop", "update", "signals", "monitor", "backtest", "walkforward", "stress", "paper"],
+        help="Mode: ui, desktop, update, signals, monitor, backtest, walkforward, stress, paper",
     )
     parser.add_argument("--force-full", action="store_true", help="Force full historical download")
     parser.add_argument("--min-score", type=int, default=6, help="Backtest: minimum signal score")
@@ -210,8 +140,6 @@ def main():
             monitor.close()
     elif args.mode == "backtest":
         run_backtest(args)
-    elif args.mode == "backtest-legacy":
-        run_backtest_legacy(args)
     elif args.mode == "walkforward":
         run_walkforward(args)
     elif args.mode == "stress":

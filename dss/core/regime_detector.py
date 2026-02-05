@@ -37,8 +37,9 @@ class MarketRegimeDetector:
     
     BB_SQUEEZE_THRESHOLD = 0.02  # 2% bandwidth = squeeze
     
-    def __init__(self):
-        self.db = MarketDatabase()
+    def __init__(self, db=None):
+        self.db = db or MarketDatabase()
+        self._owns_db = db is None
     
     def detect_regime(
         self,
@@ -255,5 +256,6 @@ class MarketRegimeDetector:
         }
     
     def close(self):
-        """Cleanup"""
-        self.db.close()
+        """Cleanup - only close db if we own it"""
+        if self._owns_db:
+            self.db.close()
