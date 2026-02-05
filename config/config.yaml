@@ -1,0 +1,187 @@
+# Trading System Configuration
+# Per Trading System Specification v1.0
+
+# =============================================================================
+# DATA PROVIDER SETTINGS
+# =============================================================================
+data_provider:
+  provider: "polygon"
+  update_interval_minutes: 15
+  symbols_file: "config/watchlist.txt"
+  # Rate limiting based on Polygon plan
+  plan: "starter"  # free, starter, developer, advanced
+  requests_per_minute: 200  # Starter: unlimited but ~200/min recommended
+  historical_years: 5  # Years of historical data (Starter includes 5 years)
+
+# =============================================================================
+# MARKET SCANNER FILTERS (Section 4.2)
+# =============================================================================
+filters:
+  # Price filters
+  min_price: 5.0       # > $5 (avoids penny stocks)
+  max_price: 500.0     # < $500 (feasible position sizing)
+  
+  # Volume filters
+  min_avg_volume: 500000        # > 500K shares/day (liquidity)
+  min_dollar_volume: 5000000    # > $5M/day dollar volume
+  
+  # Market cap filter
+  min_market_cap: 500000000     # > $500M (filters micro-caps)
+  
+  # Volatility filter (NATR = ATR as % of price)
+  # NOTE: min_natr filter disabled - was filtering out too many good signals
+  # NOTE: Tested 5.0% but filtered too many profitable stocks, increased to 8.0%
+  max_natr: 8.0    # Max 8% (avoid extremely volatile stocks that gap through stops)
+  
+  # Spread filter
+  max_spread_percent: 0.3  # < 0.3% (minimizes Trade Republic spread impact)
+  
+  # Benchmark for market regime
+  benchmark_symbol: "SPY"
+
+# =============================================================================
+# SIGNAL SCORING SYSTEM (Section 6 - 100-Point Scale)
+# =============================================================================
+scoring:
+  # Category weights (must sum to 100)
+  weight_trend: 35        # Trend Alignment (35%)
+  weight_momentum: 25     # Momentum Confirmation (25%)
+  weight_volume: 20       # Volume Validation (20%)
+  weight_volatility: 10   # Volatility Context (10%)
+  weight_pattern: 10      # Pattern Recognition (10%)
+  
+  # Signal thresholds
+  threshold_strong: 80    # 80-100: Strong Signal (primary alert)
+  threshold_moderate: 65  # 65-79: Moderate Signal (watchlist)
+  threshold_weak: 50      # 50-64: Weak Signal (monitor only)
+  # 0-49: No Signal (filtered out)
+  
+  # Minimum score for signal generation
+  min_score: 50
+
+# =============================================================================
+# RISK MANAGEMENT (Section 7)
+# =============================================================================
+risk:
+  # Per-trade risk rules
+  max_risk_per_trade_percent: 1.5  # 1.5% of equity (optimized for better R:R)
+  max_risk_per_trade_fixed: 20     # €20 fixed (fallback for small accounts)
+  use_fixed_risk: false            # Use % of capital instead of fixed amount
+  
+  # Position limits
+  max_position_percent: 33         # Max 33% of equity per position
+  max_positions: 5                 # Max concurrent positions (dashboard default, backtest uses --slots=3)
+  max_sector_exposure_percent: 40  # Max 40% capital in any sector
+  # NOTE: max_symbols_per_sector limit disabled (was reducing win rate from 57% to 44%)
+  
+  # Capital settings
+  available_capital: 1500          # Starting capital (€)
+  
+  # Sizing method: "risk_based" or "slots"
+  sizing_method: "slots"
+  slots_count: 3                   # Capital / slots = position size
+  
+  # Stop-loss settings (ATR-based)
+  atr_multiplier: 2.0              # 2.0x ATR - optimized via backtest to avoid premature stops
+  stop_loss_cap_pct: 5.0           # Cap max stop loss at -5% (avoid excessive single-trade loss)
+  
+  # Smart stop loss (Code Review Issue #5)
+  # When enabled, combines ATR stop with support levels and uses the tighter one
+  use_smart_stop_loss: false       # Enable support-based stop enhancement
+  
+  # Take-profit settings
+  target_reward_ratio: 2.0         # Risk/Reward ratio (2:1)
+  target_atr_multiplier: 3.0       # TP2 = Entry + 3x ATR
+  tp1_atr_multiplier: 1.5          # TP1 = Entry + 1.5x ATR (sell 50%)
+  tp2_atr_multiplier: 3.0          # TP2 = Entry + 3x ATR (close remaining)
+  
+  # Trade Republic cost model (Section 7.5)
+  commission_per_trade: 1.0        # €1 per trade
+  min_trade_value: 50.0            # Minimum €50 trade value
+  min_profit_after_commissions: 5.0  # Minimum €5 profit after fees
+  
+  # Currency conversion
+  base_currency: "EUR"             # Account currency
+  market_currency: "USD"           # Market currency
+  exchange_rate: 0.92              # USD -> EUR (update regularly)
+
+# =============================================================================
+# DRAWDOWN PROTECTION (Section 7.4)
+# =============================================================================
+drawdown_protection:
+  # Consecutive loss rules
+  reduce_risk_after_losses: 3      # After 3 losses: reduce to 1% risk
+  max_one_position_after_losses: 5 # After 5 losses: max 1 position
+  recovery_wins_normal_risk: 2     # 2 wins to restore normal risk
+  recovery_wins_normal_positions: 3 # 3 wins to restore normal positions
+  
+  # Monthly drawdown rules
+  pause_at_monthly_drawdown: 6.0   # 6% monthly: pause live trading
+  stop_at_monthly_drawdown: 10.0   # 10% monthly: stop all trading
+
+# =============================================================================
+# BACKTESTING (Section 9)
+# =============================================================================
+backtesting:
+  initial_capital: 10000           # Starting capital for backtest
+  commission: 0.001                # 0.1% per trade
+  slippage: 0.001                  # 0.1% slippage
+  fx_cost: 0.0025                  # 0.25% FX conversion
+  lookback_days: 1260              # 5 years (252 * 5)
+  
+  # Walk-forward settings
+  train_pct: 70                    # 70% train, 30% validate
+  
+  # Minimum targets (Section 9.2)
+  min_win_rate: 55                 # > 55% win rate
+  min_profit_factor: 1.5           # > 1.5 profit factor
+  max_drawdown: 15                 # < 15% max drawdown
+  min_sharpe: 1.0                  # > 1.0 Sharpe ratio
+
+# =============================================================================
+# DASHBOARD UI (Section 8)
+# =============================================================================
+ui:
+  refresh_interval_seconds: 60
+  max_watchlist_display: 50
+  chart_timeframe: "1D"
+  
+  # Score color coding
+  strong_signal_color: "#4caf50"   # Green for 80+
+  moderate_signal_color: "#2196f3" # Blue for 65-79
+  weak_signal_color: "#9e9e9e"     # Gray for 50-64
+
+# =============================================================================
+# TELEGRAM ALERTS (Section 8.2)
+# =============================================================================
+telegram:
+  enabled: true
+  
+  # Alert types
+  alert_on_signal: true            # New signals
+  alert_on_price_level: true       # SL/TP approaching
+  alert_on_stop_update: true       # Trailing stop updates
+  alert_on_risk_breach: true       # Risk limit breaches
+  
+  # Signal alerts
+  max_signal_alerts: 5             # Max signals per generation
+  min_score_for_alert: 65          # Only alert for 65+ scores
+  
+  # Price monitoring
+  monitoring_interval_seconds: 300  # Check every 5 minutes
+  stop_approaching_threshold: 0.5   # Alert when within 0.5% of stop
+
+# =============================================================================
+# SCAN SCHEDULE (Section 4.3)
+# =============================================================================
+scan_schedule:
+  # Pre-market scan: 8:00 AM EST (13:00 UTC, 14:00 CET)
+  premarket_hour_utc: 13
+  
+  # Midday refresh: 12:30 PM EST (17:30 UTC, 18:30 CET)
+  midday_hour_utc: 17
+  midday_minute: 30
+  
+  # Post-market review: 4:30 PM EST (21:30 UTC, 22:30 CET)
+  postmarket_hour_utc: 21
+  postmarket_minute: 30

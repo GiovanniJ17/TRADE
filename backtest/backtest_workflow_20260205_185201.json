@@ -1,0 +1,24 @@
+{
+  "strategy": "workflow_tue_fri",
+  "start_date": "2022-02-06",
+  "end_date": "2026-02-05",
+  "initial_capital": 15000.0,
+  "final_capital": 17881.061558585974,
+  "total_return_pct": 19.207077057239825,
+  "metrics": {
+    "total_trades": 261,
+    "winning_trades": 123,
+    "losing_trades": 138,
+    "win_rate": 47.13,
+    "profit_factor": 1.12,
+    "avg_r_multiple": 0.06,
+    "sharpe_ratio": 0.35,
+    "max_drawdown": -3640.35,
+    "max_drawdown_pct": -24.27,
+    "best_trade": 1412.52,
+    "worst_trade": -248.03,
+    "cagr": 4.5
+  },
+  "total_trades": 261,
+  "weeks_simulated": 208
+}
